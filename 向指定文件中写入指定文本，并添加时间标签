@@ -1,0 +1,53 @@
+package com.it.taikang.utils;
+
+import java.io.FileWriter;
+import java.text.SimpleDateFormat;
+
+public class WriteTextToFile {
+	/**
+	 * 向指定文件中写入指定文本，并添加时间标签
+	 * @param str
+	 * @param filepath
+	 * @return
+	 */
+	 public static int WriterLog(String str,String filepath) {
+	        int rs = 0;
+	        SimpleDateFormat sdf = new SimpleDateFormat("yyyy-MM-dd HH:mm:ss");
+	        java.util.Date d = new java.util.Date();     
+	        try {
+
+	            FileWriter writer = new FileWriter(filepath, true);//a.txt创建到默认的包名下的文件夹下；
+	            System.out.println();
+	            String separator = System.getProperty("line.separator");//换行符
+	            writer.write(sdf.format(d) + " " + str + ";"+separator);
+	            writer.close();
+	            rs = 1;
+	        } catch (Exception ex) {
+	            System.out.println(ex.getMessage());
+	        }
+
+	        return rs;
+	 }
+	 	/**
+		 * 向指定文件中写入指定文本，添加换行
+		 * @param str
+		 * @param filepath
+		 * @return
+		 */
+		 public static int WriterTxt(String str,String filepath) {
+		        int rs = 0;
+		        try {
+
+		            FileWriter writer = new FileWriter(filepath, true);//a.txt创建到默认的包名下的文件夹下；
+		            System.out.println();
+		            String separator = System.getProperty("line.separator");//换行符
+		            writer.write(str+separator);
+		            writer.close();
+		            rs = 1;
+		        } catch (Exception ex) {
+		            System.out.println(ex.getMessage());
+		        }
+
+		        return rs;
+		 }
+}

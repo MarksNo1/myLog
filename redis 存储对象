@@ -1,0 +1,230 @@
+  如果需要用到Redis存储List对象，而list又不需要进行操作，可以按照MC的方式进行存储，不过Jedis之类的客户端没有提供API，可以有两种思路实现：
+1.      分别序列化 elements ,然后 set 存储
+2.    序列化List对象，set存储
+这两种方法都类似MC的 Object方法存储，运用这种方式意味着放弃Redis对List提供的操作方法。
+[java] view plain copy
+ print?
+  1. import net.spy.memcached.compat.CloseUtil;  
+  2. import net.spy.memcached.compat.log.Logger;  
+  3. import net.spy.memcached.compat.log.LoggerFactory;  
+  4. import redis.clients.jedis.Client;  
+  5. import redis.clients.jedis.Jedis;  
+  6. import redis.clients.jedis.JedisPool;  
+  7. import redis.clients.jedis.JedisPoolConfig;  
+  8.   
+  9. import java.io.*;  
+  10. import java.util.ArrayList;  
+  11. import java.util.List;  
+  12. import java.util.Random;  
+  13.   
+  14. /** 
+  15.  * Created by IntelliJ IDEA. 
+  16.  * User: taomeng 
+  17.  * Date: 16-10-11
+  18.  * Time: 上午11:10 
+  19.  * To change this template use File | Settings | File Templates. 
+  20.  */  
+  21. public class JedisTest {  
+  22.   
+  23.     private static Logger logger = LoggerFactory.getLogger(JedisTest.class);  
+  24.   
+  25.     /** 
+  26.      * Jedis Pool for Jedis Resource 
+  27.      * @return 
+  28.      */  
+  29.     public static JedisPool buildJedisPool(){  
+  30.         JedisPoolConfig config = new JedisPoolConfig();  
+  31.         config.setMaxActive(1);  
+  32.         config.setMinIdle(50);  
+  33.         config.setMaxIdle(3000);  
+  34.         config.setMaxWait(5000);  
+  35.         JedisPool jedisPool = new JedisPool(config,  
+  36.                 "*****", ****);  
+  37.         return jedisPool;  
+  38.     }  
+  39.   
+  40.     /** 
+  41.      * Test Data 
+  42.      * @return 
+  43.      */  
+  44.     public static List<User> buildTestData(){  
+  45.         User a = new User();  
+  46.         a.setName("a");  
+  47.         User b = new User();  
+  48.         b.setName("b");  
+  49.         List<User> list = new ArrayList<User>();  
+  50.         list.add(a);  
+  51.         list.add(b);  
+  52.         return list;  
+  53.     }  
+  54.   
+  55.     /** 
+  56.      * Test for 
+  57.      */  
+  58.     public static void testSetElements(){  
+  59.         List<User> testData = buildTestData();  
+  60.         Jedis jedis = buildJedisPool().getResource();  
+  61.         String key = "testSetElements" + new Random(1000).nextInt();  
+  62.         jedis.set(key.getBytes(), ObjectsTranscoder.serialize(testData));  
+  63.   
+  64.         //验证  
+  65.         byte[] in = jedis.get(key.getBytes());  
+  66.         List<User> list = ObjectsTranscoder.deserialize(in);  
+  67.         for(User user : list){  
+  68.             System.out.println("testSetElements user name is:" + user.getName());  
+  69.         }  
+  70.     }  
+  71.   
+  72.     public static void testSetEnsemble(){  
+  73.         List<User> testData = buildTestData();  
+  74.         Jedis jedis = buildJedisPool().getResource();  
+  75.         String key = "testSetEnsemble" + new Random(1000).nextInt();  
+  76.         jedis.set(key.getBytes(), ListTranscoder.serialize(testData));  
+  77.   
+  78.         //验证  
+  79.         byte[] in = jedis.get(key.getBytes());  
+  80.         List<User> list = (List<User>)ListTranscoder.deserialize(in);  
+  81.         for(User user : list){  
+  82.             System.out.println("testSetEnsemble user name is:" + user.getName());  
+  83.         }  
+  84.     }  
+  85.   
+  86.     public static void main(String[] args) {  
+  87.         testSetElements();  
+  88.         testSetEnsemble();  
+  89.     }  
+  90.   
+  91.     public static void close(Closeable closeable) {  
+  92.         if (closeable != null) {  
+  93.             try {  
+  94.                 closeable.close();  
+  95.             } catch (Exception e) {  
+  96.                 logger.info("Unable to close %s", closeable, e);  
+  97.             }  
+  98.         }  
+  99.     }  
+  100.   
+  101.     static class User implements Serializable{  
+  102.         String name;  
+  103.   
+  104.         public String getName() {  
+  105.             return name;  
+  106.         }  
+  107.   
+  108.         public void setName(String name) {  
+  109.             this.name = name;  
+  110.         }  
+  111.     }  
+  112.   
+  113.     static class ObjectsTranscoder{  
+  114.           
+  115.         public static byte[] serialize(List<User> value) {  
+  116.             if (value == null) {  
+  117.                 throw new NullPointerException("Can't serialize null");  
+  118.             }  
+  119.             byte[] rv=null;  
+  120.             ByteArrayOutputStream bos = null;  
+  121.             ObjectOutputStream os = null;  
+  122.             try {  
+  123.                 bos = new ByteArrayOutputStream();  
+  124.                 os = new ObjectOutputStream(bos);  
+  125.                 for(User user : value){  
+  126.                     os.writeObject(user);  
+  127.                 }  
+  128.                 os.writeObject(null);  
+  129.                 os.close();  
+  130.                 bos.close();  
+  131.                 rv = bos.toByteArray();  
+  132.             } catch (IOException e) {  
+  133.                 throw new IllegalArgumentException("Non-serializable object", e);  
+  134.             } finally {  
+  135.                 close(os);  
+  136.                 close(bos);  
+  137.             }  
+  138.             return rv;  
+  139.         }  
+  140.   
+  141.         public static List<User> deserialize(byte[] in) {  
+  142.             List<User> list = new ArrayList<User>();  
+  143.             ByteArrayInputStream bis = null;  
+  144.             ObjectInputStream is = null;  
+  145.             try {  
+  146.                 if(in != null) {  
+  147.                     bis=new ByteArrayInputStream(in);  
+  148.                     is=new ObjectInputStream(bis);  
+  149.                     while (true) {  
+  150.                         User user = (User) is.readObject();  
+  151.                         if(user == null){  
+  152.                             break;  
+  153.                         }else{  
+  154.                             list.add(user);  
+  155.                         }  
+  156.                     }  
+  157.                     is.close();  
+  158.                     bis.close();  
+  159.                 }  
+  160.             } catch (IOException e) {  
+  161.                 logger.warn("Caught IOException decoding %d bytes of data",  
+  162.                         in == null ? 0 : in.length, e);  
+  163.             } catch (ClassNotFoundException e) {  
+  164.                 logger.warn("Caught CNFE decoding %d bytes of data",  
+  165.                         in == null ? 0 : in.length, e);  
+  166.             } finally {  
+  167.                 CloseUtil.close(is);  
+  168.                 CloseUtil.close(bis);  
+  169.             }  
+  170.             return list;  
+  171.         }  
+  172.     }  
+  173.       
+  174.     static class ListTranscoder{  
+  175.         public static byte[] serialize(Object value) {  
+  176.             if (value == null) {  
+  177.                 throw new NullPointerException("Can't serialize null");  
+  178.             }  
+  179.             byte[] rv=null;  
+  180.             ByteArrayOutputStream bos = null;  
+  181.             ObjectOutputStream os = null;  
+  182.             try {  
+  183.                 bos = new ByteArrayOutputStream();  
+  184.                 os = new ObjectOutputStream(bos);  
+  185.                 os.writeObject(value);  
+  186.                 os.close();  
+  187.                 bos.close();  
+  188.                 rv = bos.toByteArray();  
+  189.             } catch (IOException e) {  
+  190.                 throw new IllegalArgumentException("Non-serializable object", e);  
+  191.             } finally {  
+  192.                 close(os);  
+  193.                 close(bos);  
+  194.             }  
+  195.             return rv;  
+  196.         }  
+  197.   
+  198.         public static Object deserialize(byte[] in) {  
+  199.             Object rv=null;  
+  200.             ByteArrayInputStream bis = null;  
+  201.             ObjectInputStream is = null;  
+  202.             try {  
+  203.                 if(in != null) {  
+  204.                     bis=new ByteArrayInputStream(in);  
+  205.                     is=new ObjectInputStream(bis);  
+  206.                     rv=is.readObject();  
+  207.                     is.close();  
+  208.                     bis.close();  
+  209.                 }  
+  210.             } catch (IOException e) {  
+  211.                 logger.warn("Caught IOException decoding %d bytes of data",  
+  212.                         in == null ? 0 : in.length, e);  
+  213.             } catch (ClassNotFoundException e) {  
+  214.                 logger.warn("Caught CNFE decoding %d bytes of data",  
+  215.                         in == null ? 0 : in.length, e);  
+  216.             } finally {  
+  217.                 CloseUtil.close(is);  
+  218.                 CloseUtil.close(bis);  
+  219.             }  
+  220.             return rv;  
+  221.         }  
+  222.     }  
+  223. }  
+PS：Redsi中存储list没有封装对Object的API，是不是也是倾向于只存储用到的字段，而不是存储Object本身呢？Redis是一个In-Mem的产品，会觉得我们应用的方式。

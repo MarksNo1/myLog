@@ -1,0 +1,22 @@
+错误：Java.lang.IllegalArgumentException: Maximum number of fonts was exceeded
+出错原因：我们在导出Excel表格时会给Excel生成字体：
+       HSSFFont font = workbook.createFont();
+而这个font字体我们如果在数据循环尤其是记录条数比较多上万的时候写入时用就容易出现这种错误：
+（错误例子：）
+              if(textValue!=null){
+                    Pattern p = Pattern.compile("^\\d+(\\.\\d+)?$");  
+                    Matcher matcher = p.matcher(textValue);
+                    if(matcher.matches()){
+                       //是数字当作double处理
+                       cell.setCellValue(Double.parseDouble(textValue));
+                    }else{
+                       HSSFRichTextString richString = new HSSFRichTextString(textValue);
+                       HSSFFont font3 = workbook.createFont();
+                       font3.setColor(HSSFColor.BLUE.index);
+                       richString.applyFont(font3);
+                       cell.setCellValue(richString);
+                    }
+                 }
+解决办法：把样式，字体(红色部分)的定义全部放在外面，在循环里面这要调用它就可以了
+http://download.csdn.NET/detail/nina_nn/4509365
+这里面有我用jsp,poi,jxl三个工具做出的导出项目，可以下载（3分）

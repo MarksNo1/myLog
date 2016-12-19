@@ -1,0 +1,36 @@
+1、通过hosts表查找host的ID。
+mysql> select host,hostid from hosts where host="CPDS-CR10-WAN-01";
++------------------+--------+
+|       host       | hostid |
++------------------+--------+
+| CPDS-CR10-WAN-01 |  10534 |
++------------------+--------+
+1 row in set (0.00 sec)
+2、通过items表查找主的监控项和key以及itemid。
+mysql> select itemid,name,key_ from items where hostid=10534 and key_="ifInOctets";
++--------+-----------------+------------------+
+| itemid | name            | key_             |
++--------+-----------------+------------------+
+|  58860 | 发送流量：       | ifInOctets |
++--------+-----------------+------------------+
+1 row in set (0.00 sec)
+3、通过itemid查询主机的监控项目（history_uint或者trends_uint)，单位为M。
+主机流入流量：
+mysql> select from_unixtime(clock) as DateTime,round(value/1024/1024,2) as Traffic_in
+      from history_uint where itemid="58855" and from_unixtime(clock)>='2014-09-20'
+      and from_unixtime(clock)<'2014-09-21' limit 20;
+主机流出流量：
+mysql> select from_unixtime(clock) as DateTime,round(value/1024/1024,2) as Traffic_out from
+      history_uint where itemid="58860" and from_unixtime(clock)>='2014-09-20'
+      and from_unixtime(clock)<'2014-09-21' limit 20;
+如果是两台设备，汇总流量，假如公司出口有两台设备，可以用下面的SQL语句汇总每天的流量。下面SQL语句是汇总上面主机网卡的进出流量的。
+mysql> select from_unixtime(clock,"%Y-%m-%d %H:%i") as DateTime,sum(round(value/1024/1024,2)) 
+      as Traffic_total from history_uint where itemid in (58855,58860)  
+      and from_unixtime(clock)>='2014-09-20'and from_unixtime(clock)<'2014-09-21'
+      group by from_unixtime(clock,"%Y-%m-%d %H:%i") limit 20;
+查询一天中主机流量的最大值，最小值和平均值。
+mysql> select date as DateTime,round(min(traffic)/2014/1024,2) as TotalMinIN,
+      round(avg(traffic)/1024/1024,2) as TotalAvgIN,round(max(traffic)/1024/1024,2)  as TotalMaxIN
+      from (select from_unixtime(clock,"%Y-%m-%d") as date,sum(value) as traffic from history_uint
+      where itemid in (58855,58860)  and from_unixtime(clock)>='2014-09-20'
+      and from_unixtime(clock)<'2014-09-21' group by from_unixtime(clock,"%Y-%m-%d %H:%i") ) tmp;

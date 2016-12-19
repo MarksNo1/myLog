@@ -1,0 +1,42 @@
+错误说明：
+1、java用jdbc调用mysql，取出的数据是乱码。
+解决方法：
+1、首先写一个main方法，循环取出数据，看是不是乱码，如果不是乱码，则可以判断是java程序出的问题，再去程序里做相应的操作。
+如果是乱码，则可以判断是mysql出的问题。我这里是mysql出的问题，所以我大致说一下解决mysql的问题。
+   a、因为我用的是xshell，所以，先查看xshell客户端的编码格式，utf8。
+   b、查看mysql编码格式：
+   show variables like 'char%';
++--------------------------+----------------------------+
+| Variable_name            | Value                      |
++--------------------------+----------------------------+
+| character_set_client     | latin1                     |
+| character_set_connection | latin1                     |
+| character_set_database   | utf8                       |
+| character_set_filesystem | binary                     |
+| character_set_results    | latin1                     |
+| character_set_server     | latin1                     |
+| character_set_system     | utf8                       |
+| character_sets_dir       | /usr/share/mysql/charsets/ |
++--------------------------+----------------------------+
+
+首先character_set_client这个编码格式就不对。因为客户端是utf8，而这个是latin1。所以要更改编码格式。
+mysql> \C utf8
+Charset changed
+
+改完之后，然后创建一个表进行测试，看是否成功。
+mysql> create table t1 (name varchar(200));
+Query OK, 0 rows affected (0.04 sec)
+然后插入中文数据。
+mysql> insert into t1 values ('这个是中文');
+Query OK, 1 row affected (0.00 sec)
+
+然后进行查询。
+
+mysql> select * from t1;
++-----------------+
+| name            |
++-----------------+
+| 这个是中文      |
++-----------------+
+1 row in set (0.00 sec)
+ok，完美解决。
